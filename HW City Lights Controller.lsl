@@ -1,21 +1,21 @@
 integer cityLightChan = -9834922;
 
+float curWaitTime = 0.0;
 float timeSlice = 0.33;
 integer ncLine = 0;
 integer isRunning = TRUE;
 integer inInit = TRUE;
+integer walkTrigger = FALSE;
 integer lHandle = 0;
 key configHandle = NULL_KEY;
 key programHandle = NULL_KEY;
 key walkProgHandle = NULL_KEY;
 
 string intersectionID = "";
+string walkProgName = "";
 
 list lightStates = [];
 list commandQueue = [];
-
-integer walkTrigger = FALSE;
-float curWaitTime = 0.0;
 
 integer startsWith(string input, string find)
 {
@@ -47,6 +47,19 @@ readProgram()
     }
 }
 
+updateLightStates(list queue)
+{
+    integer index = llListFindList(lightStates, [ llList2String(queue, 1) ]);
+    if(index >= 0)
+    {
+        lightStates = llListReplaceList(lightStates, [ llList2String(queue, 2) ], index + 1, index + 1);
+    }
+    else
+    {
+        lightStates += queue;
+    }
+}
+
 executeQueue(float waitTime)
 {
     integer len = llGetListLength(commandQueue);
@@ -62,19 +75,6 @@ executeQueue(float waitTime)
     commandQueue = [];
 }
 
-updateLightStates(list queue)
-{
-    integer index = llListFindList(lightStates, [ llList2String(queue, 1) ]);
-    if(index >= 0)
-    {
-        lightStates = llListReplaceList(lightStates, [ llList2String(queue, 2) ], index + 1, index + 1);
-    }
-    else
-    {
-        lightStates += queue;
-    }
-}
-
 changeAllMatching(string intersection, string curState, string newState)
 {
     integer index;
@@ -88,6 +88,30 @@ changeAllMatching(string intersection, string curState, string newState)
             commandQueue += [ intersection, signal, newState ];
         }
     }
+}
+
+processExternalCommand(string input)
+{
+	list command = llParseString2List(input, ["#$"], []);
+	if(llList2String(command, 0) == intersectionID)
+	{
+		// External commands are at the end of the string instead of the beginning (for reasons)
+		if(llList2String(command, -1) == "WALK")
+		{
+			walkProgName = llList2String(command, 1);
+			if(llGetInventoryKey(walkProgName) != NULL_KEY)
+			{
+				ncLine = 0;
+				walkTrigger = TRUE;
+				walkProgHandle = llGetNotecardLine(walkProgName, ncLine);
+			}
+			else
+			{
+				llOwnerSay("Not found: " + walkProgName);
+				walkProgName = "";
+			}
+		}
+	}
 }
 
 default
@@ -114,9 +138,8 @@ default
         {
             llListenRemove(lHandle);
             commandQueue = [];
-            ncLine = 0;
             curWaitTime = timeSlice;
-            walkTrigger = TRUE;
+			processExternalCommand(msg);
         }
     }
 
@@ -194,6 +217,7 @@ default
             {
                 lHandle = llListen(-9834922, "", NULL_KEY, "");
                 ncLine = 0;
+				walkProgName = "";
                 walkTrigger = FALSE;
             }
             else
@@ -248,15 +272,14 @@ default
             if(walkTrigger)
             {
                 // Jump to walk sequence
-                if(llGetInventoryKey("_walk") != NULL_KEY)
+                if(llGetInventoryKey(walkProgName) != NULL_KEY)
                 {
                     if(walkTrigger < 2)
                     {
-                        ncLine = 0;
                         walkTrigger = 2;
                     }
 
-                    walkProgHandle = llGetNotecardLine("_walk", ncLine);
+                    walkProgHandle = llGetNotecardLine(walkProgName, ncLine);
                 }
                 // Then return to main sequence
             }
@@ -313,7 +336,8 @@ state initLights
                     }
                     else
                     {
-                        llRegionSay(cityLightChan, llDumpList2String([ curIntersection, curSignal, "RED", 1], "#$"));
+						updateLightStates([curIntersection, curSignal, "RED"]);
+                        llRegionSay(cityLightChan, llDumpList2String([curIntersection, curSignal, "RED", 1], "#$"));
                     }
                 }
                 ++ncLine;
