@@ -37,17 +37,6 @@ string restOf(string input, string find)
     return "";
 }
 
-readConfig()
-{
-    llSetText("Reading config", <1.0, 0.0, 0.0>, 1.0);
-    llSetTimerEvent(0.0);
-    if(llGetInventoryKey("_config") != NULL_KEY)
-    {
-        ncLine = 0;
-        configHandle = llGetNotecardLine("_config", ncLine);
-    }
-}
-
 readProgram()
 {
     llSetText("Running!", <0.0, 1.0, 0.0>, 1.0);
@@ -107,14 +96,16 @@ default
     {
         llSetTimerEvent(0.0);
         lHandle = llListen(-9834922, "", NULL_KEY, "");
-        if(inInit)
-        {
-            readConfig();
-        }
+		intersectionID = llGetObjectDesc();
+		if(inInit)
+		{
+			llSetText("Initializing...", <1.0, 0.0, 0.0>, 1.0);
+			state initLights;
+		}
         else
-        {
-            readProgram();
-        }
+		{
+			readProgram();
+		}
     }
     
     listen(integer chan, string name, key uuid, string msg)
@@ -156,28 +147,6 @@ default
     
     dataserver(key requestID, string data)
     {
-        if(requestID == configHandle)
-        {
-            if(data == EOF)
-            {
-                ncLine = 0;
-                if(inInit)
-                {
-                    llSetText("Initializing...", <1.0, 0.0, 1.0>, 1.0);
-                    state initLights;
-                }
-            }
-            else
-            {
-                string option = restOf(data, "ID=");
-                if(option != "")
-                {
-                    intersectionID = option;
-                }
-                ++ncLine;
-                configHandle = llGetNotecardLine("_config", ncLine);
-            }
-        }
         if(requestID == programHandle)
         {
             if(data == EOF)
@@ -272,6 +241,10 @@ default
     {
         if(llGetTime() >= curWaitTime)
         {
+			if(intersectionID != llGetObjectDesc())
+			{
+				intersectionID = llGetObjectDesc();
+			}
             if(walkTrigger)
             {
                 // Jump to walk sequence
@@ -310,7 +283,7 @@ state initLights
         if(data == EOF)
         {
             ncLine = 0;
-            inInit = FALSE;
+			inInit = FALSE;
             state default;
         }
         else
