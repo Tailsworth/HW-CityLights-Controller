@@ -17,6 +17,17 @@ string walkProgName = "";
 list lightStates = [];
 list commandQueue = [];
 
+key initNotecard(string ncName)
+{
+	if(llGetInventoryKey(ncName) != NULL_KEY)
+	{	ncLine = 0;
+		return llGetNotecardLine(ncName, ncLine);
+	}
+	
+	llSetText("ERROR: " + ncName + " not found!", <1.0, 0.0, 0.0>, 1.0);
+	return NULL_KEY;
+}
+
 integer startsWith(string input, string find)
 {
     if(llSubStringIndex(input, find) == 0)
@@ -41,10 +52,15 @@ readProgram()
 {
     llSetText("Running!", <0.0, 1.0, 0.0>, 1.0);
     llSetTimerEvent(timeSlice);
-    if(llGetInventoryKey("_program") != NULL_KEY)
-    {
-        programHandle = llGetNotecardLine("_program", ncLine);
-    }
+	programHandle = initNotecard("_program");
+	if(programHandle == NULL_KEY)
+	{
+		llSetTimerEvent(0.0);
+	}
+	else
+	{
+		llSetTimerEvent(timeSlice);
+	}
 }
 
 updateLightStates(list queue)
@@ -99,7 +115,8 @@ processExternalCommand(string input)
 		if(llList2String(command, -1) == "WALK")
 		{
 			walkProgName = llList2String(command, 1);
-			if(llGetInventoryKey(walkProgName) != NULL_KEY)
+			walkProgHandle = initNotecard(walkProgName);
+			if(walkProgHandle != NULL_KEY)
 			{
 				ncLine = 0;
 				walkTrigger = TRUE;
@@ -107,8 +124,7 @@ processExternalCommand(string input)
 			}
 			else
 			{
-				llOwnerSay("Not found: " + walkProgName);
-				walkProgName = "";
+				llSetTimerEvent(0.0);
 			}
 		}
 	}
@@ -272,16 +288,16 @@ default
             if(walkTrigger)
             {
                 // Jump to walk sequence
-                if(llGetInventoryKey(walkProgName) != NULL_KEY)
+                if(walkProgHandle != NULL_KEY)
                 {
                     if(walkTrigger < 2)
                     {
+						walkProgHandle = initNotecard(walkProgName);
                         walkTrigger = 2;
                     }
 
                     walkProgHandle = llGetNotecardLine(walkProgName, ncLine);
                 }
-                // Then return to main sequence
             }
             else
             {
